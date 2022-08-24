@@ -45,8 +45,7 @@ for subj = 1:length(group)
 
     cd(filepath);
 
-    % runs = [0 1 2 3 4 5];
-    runs = [0];
+    runs = [0 1 2 3 4 5];
 
     n_runs = size(runs, 2);
 
