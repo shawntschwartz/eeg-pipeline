@@ -67,7 +67,7 @@ function tonic_eeg(step)
                 EEG = pop_readegi(run_file, [], [], 'auto');
         
                 %% Load channel locations
-                EEG = pop_chanedit(EEG, 'load', {[basedir, 'analysis/eeg_analysis/GSN-HydroCel-128.sfp'] 'filetype' 'autodetect'});
+                EEG = pop_chanedit(EEG, 'load', {[basedir, 'montage/GSN-HydroCel-128.sfp'] 'filetype' 'autodetect'});
         
                 %% Remove useless channels (cheeks, eyes)
                 channels_to_toss = [127, 126, 17, 25, 21, 22, 15, 14, 9, 8, ...
