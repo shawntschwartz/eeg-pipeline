@@ -4,3 +4,6 @@
 [submodule "eye-catch"]
 	path = eye-catch
 	url = git@github.com:bigdelys/eye-catch.git
+[submodule "EEG-Blinks"]
+	path = EEG-Blinks
+	url = git@github.com:VisLab/EEG-Blinks.git

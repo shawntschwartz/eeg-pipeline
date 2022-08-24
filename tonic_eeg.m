@@ -86,15 +86,47 @@ function tonic_eeg(step)
                 EEG = pop_eegfiltnew(EEG, .1); % high pass filter
                 EEG = pop_eegfiltnew(EEG, [], 30); % low pass filter
 
-                %% Remove eye artifact and blink activity from time-domain (uses EyeCatch)
-                fprintf('Removing artifacts using EyeCatch...');
-                icatype = 'runica';
-                regressBlinkEvents = false;
-                regressBlinkSignal = false;
-                [EEG, removalInfo] = removeEyeArtifactsLARG(EEG, blinkInfo, ...
-                                         icatype, regressBlinkEvents, regressBlinkSignal);
-                EEG.icaact = [];
-                save(sprintf('ret%s_removalInfo.mat', num2str(r)), 'removalInfo');
+                %% Run BLINKER to insert blink events
+                fprintf('Detecting blinks with BLINKER... ');
+
+                fieldList = {'maxFrame', 'leftZero', 'rightZero', 'leftBase', 'rightBase', ...
+                    'leftZeroHalfHeight', 'rightZeroHalfHeight'};
+
+                [EEG, com, blinks, blinkFits, blinkProperties, blinkStatistics, params] = pop_blinker(EEG, struct());
+
+                if ~isempty(blinkStatistics)
+                    % save blinkinfo data
+                    blinkInfo = struct();
+                    blinkInfo.blinks = blinks;
+                    blinkInfo.blinkFits = blinkFits;
+                    blinkInfo.blinkProperties = blinkProperties;
+                    blinkInfo.blinkStatistics = blinkStatistics;
+                    blinkInfo.blinkSignal = [];
+                    blinkInfo.custom = [];
+                    blinkInfo.custom.blinkChannel = '';
+        
+                    if isnan(blinks.usedSignal)
+                        warning('%s: does not have a blink signal', num2str(r))
+                    else
+                        blinkInfo.custom.blinkChannel = EEG.chanlocs(abs(blinks.usedSignal)).labels;
+                        if ~isempty(fieldList)
+                            [EEG, blinkSignal] = addBlinkEvents(EEG, blinks, blinkFits, blinkProperties, fieldList);
+                            blinkInfo.blinkSignal = blinkSignal;
+                        end
+                    end
+                
+                    fname = sprintf('test%s_blinkInfo.mat', num2str(r));
+                    save(fname, 'blinkInfo');
+
+                    %% Remove eye artifact and blink activity from time-domain (uses EyeCatch)
+                    fprintf('Removing artifacts using EyeCatch...');
+                    icatype = 'runica';
+                    regressBlinkEvents = false;
+                    regressBlinkSignal = false;
+                    [EEG, removalInfo] = removeEyeArtifactsLARG(EEG, blinkInfo, ...
+                                            icatype, regressBlinkEvents, regressBlinkSignal);
+                    EEG.icaact = [];
+                    save(sprintf('test%s_removalInfo.mat', num2str(r)), 'removalInfo');
             end
 
             suffix = [suffix, 'f'];
