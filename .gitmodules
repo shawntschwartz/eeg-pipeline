@@ -1,3 +1,6 @@
 [submodule "eeglab"]
 	path = eeglab
 	url = https://github.com/sccn/eeglab.git
+[submodule "eye-catch"]
+	path = eye-catch
+	url = git@github.com:bigdelys/eye-catch.git
