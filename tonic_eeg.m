@@ -70,7 +70,8 @@ for subj = 1:length(group)
             % run_file = [datadir, subid, '/eeg/ret/raw/', subid, '_test', num2str(r), '.raw'];
             run_file = [pwd, '/', subid, '_test', num2str(r), '.raw'];
             disp(run_file);
-            EEG = pop_readegi(run_file, [], [], 'auto');
+            % EEG = pop_readegi(run_file, [], [], 'auto');
+            EEG = pop_readegi(run_file, [], [], ['../../../../../../../../../../../../..', basedir, 'montage/GSN-HydroCel-128.sfp']);
     
             %% Load channel locations
             EEG = pop_chanedit(EEG, 'load', {[basedir, 'montage/GSN-HydroCel-128.sfp'] 'filetype' 'autodetect'});
