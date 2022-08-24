@@ -43,6 +43,10 @@ for subj = 1:length(group)
 
     filepath = [datadir, subid, '/eeg/ret/raw/'];
 
+    if subj > 1
+        cd(basedir);
+    end
+
     cd(filepath);
 
     runs = [0 1 2 3 4 5];
