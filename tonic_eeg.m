@@ -10,9 +10,15 @@ function tonic_eeg(step)
     %% SETUP (customize relevant paths/details here)
     basedir = '/Users/shawn/Developer/repos/eeg-pipeline/';
     scriptdir = basedir;
-    datadir = ['Users/shawn/Dropbox/Research/Stanford/wagner-lab/data_archive/spindrift/memory/include/'];
+    experiment_name = 'spindrift';
+    datadir = ['Users/shawn/Dropbox/Research/Stanford/wagner-lab/data_archive/', experiment_name, '/memory/include/'];
     subjidsfname = 'subject_ids_to_preproc.txt';
     band = 'alpha';
+    EVENT_TAG = {'retm'};
+    TONIC_EPOCH_TIMEBIN = [-1 0];
+    ERP_EPOCH_TIMEBIN = [-0.2 1];
+    ERP_BASELINE_TIMEBIN = [-200 0];
+
 
     %% load environment
     addpath(genpath(scriptdir));
@@ -30,7 +36,7 @@ function tonic_eeg(step)
             [ALLEEG, EEG, CURRENTSET, ALLCOM] = eeglab;
         end
 
-        suffix = '_spindrift_';
+        suffix = ['_', experiment_name, '_'];
 
         subid = sprintf('%s', group{subj});
         fprintf(['\n\n',subid,'\n\n']);
@@ -135,7 +141,7 @@ function tonic_eeg(step)
 
         %% Setup for post pre-processing
         suffix = [suffix, 'bfb'];
-        suffix = '_spindrift_bfb';
+        suffix = ['_', experiment_name, '_bfb'];
 
         %% Epoch dataset
         for i = 1:n_runs
@@ -149,7 +155,7 @@ function tonic_eeg(step)
         end
 
         EEG = pop_mergeset(ALLEEG, 1:n_runs, 0);
-        EEG = pop_epoch(EEG, {'retm'}, [-1 0], 'newname', 'epochs', 'epochinfo', 'yes');
+        EEG = pop_epoch(EEG, EVENT_TAG, TONIC_EPOCH_TIMEBIN, 'newname', 'epochs', 'epochinfo', 'yes');
         pop_saveset(EEG, 'filename', 'merged_raw_epochs', 'filepath', filepath);
     
 
@@ -162,7 +168,7 @@ function tonic_eeg(step)
         % this portion:
         %
         % Step 1) Run the first part of this script like normal for all
-        % subject ids: spindrift_eeg('preproc')
+        % subject ids: tonic_eeg('preproc')
         %
         % Step 2) Once all subjects have been run and preprocessed, then it's
         % time for (this) non-automated portion :(
@@ -187,7 +193,7 @@ function tonic_eeg(step)
         %   2.5) Now, after doing this for all subjects (ensuring that there's
         %   a "prestimret_rejected_epochs.csv" file in every subject folder
         %   unique to each subjects' rejected epochs, then run
-        %   "spindrift_eeg('filter')" which will take those rejected epochs
+        %   "tonic_eeg('filter')" which will take those rejected epochs
         %   into account when pulling out alpha bands/ERPs. **If no
         %   "prestimret_rejected_epochs.csv" file exists, then I made it assume
         %   that all epochs are good and it won't crash but instead run
@@ -213,8 +219,8 @@ function tonic_eeg(step)
 
         %% EEG BAND FILTERING STEP
         if strcmp(step, 'filter')
-            %% setup
-            suffix = '_spindrift_bfb';
+            %% Setup
+            suffix = ['_', experiment_name, '_bfb'];
             total_trials = [1:(length(runs)*32)];
 
             %% EPOCH REMOVAL LOADING STEP
@@ -280,7 +286,7 @@ function tonic_eeg(step)
                 save([subid, '_test', r, '_', band, '_chan_means'], 'run_chan_means');
 
                 %% Epoch: 1s prestim
-                EEG = pop_epoch(EEG, {'retm'}, [-1 0], 'newname', ...
+                EEG = pop_epoch(EEG, EVENT_TAG, TONIC_EPOCH_TIMEBIN, 'newname', ...
                     [subid, '_test', num2str(r), '_prestim_e'], 'epochinfo', 'yes');
 
                 %% Save out epoched data
@@ -352,11 +358,11 @@ function tonic_eeg(step)
                                 [datadir, subid, '/eeg/ret/raw/']);
 
                 %% Get Relevant Epochs
-                EEG = pop_epoch(EEG, {'retm'}, [-0.2 1], 'newname', ...
+                EEG = pop_epoch(EEG, EVENT_TAG, ERP_EPOCH_TIMEBIN, 'newname', ...
                     [subid, '_test', num2str(r), '_erp_prestim'], 'epochinfo', 'yes');
 
                 %% Perform baseline correction
-                EEG = pop_rmbase(EEG, [-200 0]);
+                EEG = pop_rmbase(EEG, ERP_BASELINE_TIMEBIN);
 
                 [ALLEEG] = eeg_store(ALLEEG, EEG, i);
             end
