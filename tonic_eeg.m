@@ -18,6 +18,7 @@ EVENT_TAG = {'retm'};
 TONIC_EPOCH_TIMEBIN = [-1 0];
 ERP_EPOCH_TIMEBIN = [-0.2 1];
 ERP_BASELINE_TIMEBIN = [-200 0];
+TRIALS_PER_RUN = 32;
 
 %% load environment
 addpath(genpath(scriptdir));
@@ -27,6 +28,15 @@ group = importdata([datadir, subjidsfname]); % one subject name per line
 if nargin < 1
     step = 'preproc';
 end
+
+%% Naming key:
+% bandpass filter -> f
+% reject bad channels -> b
+% manually prune -> p
+% average rereference -> r
+% center -> c
+% epoch -> e
+% concatenated runs -> cat
 
 %% begin iterating over EEG data for each subject
 for subj = 1:length(group)
@@ -261,14 +271,14 @@ for subj = 1:length(group)
     if strcmp(step, 'filter')
         %% Setup
         suffix = ['_', experiment_name, '_bfb'];
-        total_trials = [1:(length(runs)*32)];
+        total_trials = [1:(length(runs)*TRIALS_PER_RUN)];
 
         %% EPOCH REMOVAL LOADING STEP
         % bring in rejected_epochs.csv file
         if exist('prestimret_rejected_epochs.csv', 'file')
             bad_prestim_epochs = csvread('prestimret_rejected_epochs.csv');
         else
-            bad_prestim_epochs = zeros(length(runs)*32, 1);
+            bad_prestim_epochs = zeros(length(runs)*TRIALS_PER_RUN, 1);
         end
 
         keep_these_trials = [];
