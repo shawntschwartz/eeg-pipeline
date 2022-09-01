@@ -329,8 +329,8 @@ for subj = 1:length(group)
     % step... since it will rely upon the GUI.
     %
     % Find the first instance of the 'retm' event tag, then add a
-    % psuedoevent tag called 'aaaa' within a 1-s latency **BEFORE** the 
-    % 'retm' tag. Then, save out the data set and use this in the downstream
+    % psuedoevent tag called 'aaaa' within a 1-s latency after the 'retm'
+    % tag. Then, save out the data set and use this in the downstream
     % filtering steps.
     %
     % NOTE: This step is an attempt to work around this bug -- this step is
@@ -347,32 +347,12 @@ for subj = 1:length(group)
         clear;
         clc;
 
-        % CHANGE THIS HERE FOR EACH SUBJECT THAT NEEDS TO BE FIXED:
-        SUBJ_TO_INSPECT = 'm015';
-        RUNS_TO_INJECT = [0 1 3 4 5];
+        SUBJ_TO_INSPECT = 'm999';
+        RUNS_TO_INJECT = [3];
 
-        %% SETUP (copied from the init part of the script)
-        basedir = '/Users/shawn/Developer/repos/eeg-pipeline/';
-        scriptdir = basedir;
-        experiment_name = 'spindrift';
-        datadir = ['../../../Dropbox/Research/Stanford/wagner-lab/data_archive/', experiment_name, '/memory/include/'];
-        subjidsfname = 'subject_ids_to_preproc.txt';
-        band = 'alpha';
-        FILTER_TYPE = 'alpha_prestimret';
-        % FILTER_TYPE = 'ERP';
-        EVENT_TAG = {'retm'};
-        TONIC_EPOCH_TIMEBIN = [-1 0];
-        ERP_EPOCH_TIMEBIN = [-0.2 1];
-        ERP_BASELINE_TIMEBIN = [-200 0];
-        TRIALS_PER_RUN = 32;
-        runs = [0 1 2 3 4 5];
-        n_runs = size(runs, 2);
+        warning(SUBJ_TO_INSPECT);
 
-        subid = SUBJ_TO_INSPECT;
-
-        warning(subid);
-
-        cd(['/Users/shawn/Dropbox/Research/Stanford/wagner-lab/data_archive/spindrift/memory/include/', subid, '/eeg/ret/raw']);
+        cd(['/Users/shawn/Dropbox/Research/Stanford/wagner-lab/data_archive/spindrift/memory/include/', SUBJ_TO_INSPECT, '/eeg/ret/raw']);
 
         [ALLEEG, EEG, CURRENTSET, ALLCOM] = eeglab;
         
@@ -398,173 +378,9 @@ for subj = 1:length(group)
 
         csvwrite([subid, '_', FILTER_TYPE, '_trials.csv'], keep_these_trials');
 
-        %% FILTER STEP
-        for i = 1:n_runs
-            %% Setup
-            r = num2str(runs(i));
-            currsuffix = suffix;
+        
 
-            %% Average Rereference by run
-            % Load manually inspected set
-            file = [subid, '_test', r, suffix, '.set'];
-            EEG = pop_loadset('filename', file);
-            EEG = pop_reref(EEG, []);
 
-            % if this is one of the impacted runs, then load up the GUI to
-            % inject the pseudoevent tag
-            if contains(num2str(RUNS_TO_INJECT), r)
-                EEG = pop_editeventvals(EEG)
-            end
-
-            %% Save
-            suffix = [suffix, 'r'];
-            [ALLEEG, EEG, CURRENTSET] = pop_newset(ALLEEG, EEG, 1, 'setname', ...
-                [subid, '_test', r, '_rereferenced'], 'savenew', [subid, '_test', r, suffix, '.set'], ...
-                'overwrite', 'on', 'gui', 'off');
-
-            %% Reset
-            suffix = currsuffix;
-        end
-
-        suffix = [suffix, 'r'];
-    
-        PAF = 10;
-
-        %% Compute instantaneous power
-        for i = 1:n_runs
-            %% Setup
-            r = num2str(runs(i));
-
-            %% Load dataset
-            EEG = pop_loadset('filename', [subid, '_test', r, suffix, '.set']);
-
-            %% Compute
-            EEG_power = comp_power_PAF(EEG, band, PAF);
-
-            %% Epoch prestimulus
-            EEG = EEG_power;
-
-            %% Center by run
-            run_chan_means = mean(EEG.data, 2);
-            save([subid, '_test', r, '_', band, '_chan_means'], 'run_chan_means');
-
-            %% Epoch: 1s prestim
-            EEG = pop_epoch(EEG, EVENT_TAG, TONIC_EPOCH_TIMEBIN, 'newname', ...
-                [subid, '_test', num2str(r), '_prestim_e'], 'epochinfo', 'yes');
-
-            %% Save out epoched data
-            [ALLEEG, EEG, CURRENTSET] = pop_newset(ALLEEG, EEG, 1, 'setname', ...
-                                [subid, '_test', num2str(r), '_', FILTER_TYPE], 'savenew', ...
-                                [subid, '_test', r, suffix, 'e_', FILTER_TYPE, '.set'], ...
-                                'overwrite', 'on', 'gui', 'off');
-        end
-
-        %% Concatenate prestim runs
-        for i = 1:n_runs
-            %% Setup
-            r = runs(i);
-
-            %% Load the epoched sets
-            EEG = pop_loadset('filename', ...
-                [pwd, '/', subid, '_test', num2str(r), suffix, 'e_', FILTER_TYPE, '.set']);
-    
-            [ALLEEG] = eeg_store(ALLEEG, EEG, i);
-        end
-
-        %% Merge sets
-        EEG = pop_mergeset(ALLEEG, 1:n_runs, 0);
-
-        %% Remove bad epochs
-        bad_epochs = bad_prestim_epochs;
-        EEG = pop_rejepoch(EEG, bad_epochs, 0);
-
-        %% Save
-        [ALLEEG, EEG, CURRENTSET] = pop_newset(ALLEEG, EEG, 1, 'setname', ...
-                            'Merged datasets', 'savenew', ...
-                            [subid, suffix, 'e_', FILTER_TYPE, '_cat.set'], ...
-                            'overwrite', 'on', 'gui', 'off');
-
-        %% Save prestim data
-        EEG = pop_loadset('filename', [subid, suffix, 'e_', FILTER_TYPE, '_cat.set']);
-
-        %% Get metadata
-        [n_channels, n_timepoints, n_trials] = size(EEG.data);
-
-        %% Save raw prestim data (channel X time X trials)
-        raw_prestim_file = [pwd, '/', subid, suffix, 'e_', FILTER_TYPE, '.csv'];
-
-        %% Directory cleanup (if necessary)
-        if exist(raw_prestim_file, 'file') == 2
-            unix('mkdir -p trash');
-            unix(['mv ', raw_prestim_file, ' trash']);
-        end
-
-        %% Append channel data to raw power output CSVs
-        for c = 1:n_channels
-            channel_data = reshape(EEG.data(c,:,:), n_timepoints, n_trials);
-            
-            % Add column with channel number
-            label_c = EEG.chanlocs(c).labels;
-            label_c = str2num(label_c(2:end));
-            channel_data = [channel_data, repmat(label_c, n_timepoints, 1)];
-                                
-            dlmwrite(raw_prestim_file, channel_data, '-append');
-        end
-
-        %% Pre-Stim ERPs (Parietal Old/New and FN400)
-        for i = 1:n_runs
-            %% Setup
-            r = num2str(runs(i));
-    
-            %% Load dataset
-            EEG = pop_loadset('filename', [subid, '_test', r, suffix, '.set']);
-
-            %% Get Relevant Epochs
-            EEG = pop_epoch(EEG, EVENT_TAG, ERP_EPOCH_TIMEBIN, 'newname', ...
-                [subid, '_test', num2str(r), '_erp_prestimret'], 'epochinfo', 'yes');
-
-            %% Perform baseline correction
-            EEG = pop_rmbase(EEG, ERP_BASELINE_TIMEBIN);
-
-            [ALLEEG] = eeg_store(ALLEEG, EEG, i);
-        end
-
-        suffix = [suffix, 'e'];
-
-        %% Merge sets
-        EEG = pop_mergeset(ALLEEG, 1:n_runs, 0);
-
-        %% Remove bad epochs
-        if ~isempty(bad_prestim_epochs)
-            EEG = pop_rejepoch(EEG, bad_prestim_epochs, 0);
-        end
-
-        %% Save EEGLAB set
-        [ALLEEG, EEG, CURRENTSET] = pop_newset(ALLEEG, EEG, 1, 'setname', ...
-                            'Merged datasets', 'savenew', ...
-                            [subid, suffix, '_erp_prestimret_cat.set'], ...
-                            'overwrite', 'on', 'gui', 'off');
-
-        %% Save raw
-        [n_channels, n_timepoints, n_trials] = size(EEG.data);
-    
-        erp_prestim_file = [pwd, '/', subid, suffix, '_erp_prestimret.csv'];
-    
-        if exist(erp_prestim_file, 'file') == 2
-            unix('mkdir -p trash');
-            unix(['mv ', erp_prestim_file, ' trash']);
-        end
-
-        for c = 1:n_channels
-            channel_data = reshape(EEG.data(c, :, :), n_timepoints, n_trials);
-            
-            % Add column with channel number
-            label_c = EEG.chanlocs(c).labels;
-            label_c = str2num(label_c(2:end));
-            channel_data = [channel_data, repmat(label_c, n_timepoints, 1)];
-                                
-            dlmwrite(erp_prestim_file, channel_data, '-append');
-        end
     end
 
 

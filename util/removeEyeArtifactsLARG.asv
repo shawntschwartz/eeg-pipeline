@@ -51,7 +51,7 @@ if ~isempty(blinkInfo)
     elseif ~isempty(blinkInfo.blinkSignal)
         %disp(size(EEG.data));
         %disp(size(blinkInfo.blinkSignal));
-        warning('NOW SUBTRACTING OUT BLINKER SIGNAL!')
+        fprintf('SUBTRACTING OUT BLINKER SIGNAL!')
         x = EEG.data / blinkInfo.blinkSignal;
         EEG.data = EEG.data - x * blinkInfo.blinkSignal;
     end
