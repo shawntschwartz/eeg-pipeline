@@ -14,10 +14,13 @@ experiment_name = 'spindrift';
 datadir = ['../../../Dropbox/Research/Stanford/wagner-lab/data_archive/', experiment_name, '/memory/include/'];
 subjidsfname = 'subject_ids_to_preproc.txt';
 band = 'alpha';
+% band = 'theta';
 FILTER_TYPE = 'alpha_prestimret';
+% FILTER_TYPE = 'theta_prestimret';
 % FILTER_TYPE = 'ERP';
 EVENT_TAG = {'retm'};
-TONIC_EPOCH_TIMEBIN = [-1 0];
+% TONIC_EPOCH_TIMEBIN = [-1 0];
+TONIC_EPOCH_TIMEBIN = [-10 0];
 ERP_EPOCH_TIMEBIN = [-0.2 1];
 ERP_BASELINE_TIMEBIN = [-200 0];
 TRIALS_PER_RUN = 32;
@@ -67,6 +70,7 @@ for subj = 1:length(group)
     % -- otherwise, EyeCatch will throw an error and the preprocessing won't continue
 %     icatypes_per_run = {'', '', '', '', '', ''};
     icatypes_per_run = {'runica', 'runica', 'runica', 'runica', 'runica', 'runica'};
+%     icatypes_per_run = {'runica', '', 'runica', 'runica', 'runica', 'runica'};
 
     n_runs = size(runs, 2);
 
@@ -201,6 +205,11 @@ for subj = 1:length(group)
             %% Load in dataset
             EEG = pop_loadset('filename', file);
             EEG = pop_select(EEG, 'nochannel', all_reject);
+
+            if subid == 'm026'
+                EEG = pop_select(EEG, 'nochannel', {'E76', 'E77'}); % just for subject m026
+            end
+
             suffix = [suffix, 'b'];
     
             %% Save out indices -- reject all for each run (union)
@@ -284,12 +293,13 @@ for subj = 1:length(group)
         clear;
         clc;
 
-        SUBJ_TO_INSPECT = 'm999';
+        SUBJ_TO_INSPECT = 'm034';
         warning(SUBJ_TO_INSPECT);
 
         cd(['/Users/shawn/Dropbox/Research/Stanford/wagner-lab/data_archive/spindrift/memory/include/', SUBJ_TO_INSPECT, '/eeg/ret/raw']);
 
         EPOCH_TYPE = 'alpha_prestimret';
+%         EPOCH_TYPE = 'theta_prestimret';
 
         [ALLEEG, EEG, CURRENTSET, ALLCOM] = eeglab;
         file_to_load = 'merged_raw_epochs.set';
@@ -306,10 +316,26 @@ for subj = 1:length(group)
             non_alpha_channels_to_toss = non_alpha_channels_to_toss(~cellfun('isempty', non_alpha_channels_to_toss));
             EEG = pop_select(EEG, 'nochannel', non_alpha_channels_to_toss);
         end
-        
-%         pop_eegthresh(EEG, 1)
 
-        pop_eegplot(EEG, 1, 1, 0);
+        if strcmp(EPOCH_TYPE, 'theta_prestimret')
+            MAN_REJ_FNAME = strcat(SUBJ_TO_INSPECT, '_', EPOCH_TYPE, '_rejected_epochs.csv');
+            theta_channels = [5, 6, 7, 11, 12, 13, 106, 112]; % midfrontal theta
+            for i = 1:128
+                if ~any(theta_channels(:) == i)
+                    non_theta_channels_to_toss{i} = strcat('E', num2str(i));
+                end
+            end
+            non_theta_channels_to_toss = non_theta_channels_to_toss(~cellfun('isempty', non_theta_channels_to_toss));
+            EEG = pop_select(EEG, 'nochannel', non_theta_channels_to_toss);
+        end
+        
+        % pop_eegthresh(EEG, 1) % set lower/upper threshold to +/- 200 mV
+        % (Stimulus-Induced Changes in 1/f-like Background Activity in EEG;
+        % https://doi.org/10.1523/JNEUROSCI.0414-22.2022)
+        % set lower/upper threshold to +/- 100 mV (https://www.jneurosci.org/content/42/38/7285)
+        pop_eegthresh(EEG, 1) % set lower/upper threshold to +/- 150 mV
+
+%         pop_eegplot(EEG, 1, 1, 0);
         uiwait();
         rejected_trials = EEG.reject.rejmanual;
         rejected_trials = rejected_trials';
@@ -348,8 +374,8 @@ for subj = 1:length(group)
         clc;
 
         % CHANGE THIS HERE FOR EACH SUBJECT THAT NEEDS TO BE FIXED:
-        SUBJ_TO_INSPECT = 'm015';
-        RUNS_TO_INJECT = [0 1 3 4 5];
+        SUBJ_TO_INSPECT = 'm032';
+        RUNS_TO_INJECT = [2];
 
         %% SETUP (copied from the init part of the script)
         basedir = '/Users/shawn/Developer/repos/eeg-pipeline/';
@@ -524,7 +550,7 @@ for subj = 1:length(group)
                 [subid, '_test', num2str(r), '_erp_prestimret'], 'epochinfo', 'yes');
 
             %% Perform baseline correction
-            EEG = pop_rmbase(EEG, ERP_BASELINE_TIMEBIN);
+%             EEG = pop_rmbase(EEG, ERP_BASELINE_TIMEBIN);
 
             [ALLEEG] = eeg_store(ALLEEG, EEG, i);
         end
@@ -592,7 +618,7 @@ for subj = 1:length(group)
 
         csvwrite([subid, '_', FILTER_TYPE, '_trials.csv'], keep_these_trials');
 
-        if strcmp(FILTER_TYPE, 'alpha_prestimret')
+        if strcmp(FILTER_TYPE, 'alpha_prestimret') | strcmp(FILTER_TYPE, 'theta_prestimret')
             %% FILTER STEP
             for i = 1:n_runs
                 %% Setup
@@ -701,59 +727,61 @@ for subj = 1:length(group)
             end
         end 
 
-        %% Pre-Stim ERPs (Parietal Old/New and FN400)
-        for i = 1:n_runs
-            %% Setup
-            r = num2str(runs(i));
+        if strcmp(band, 'alpha')
+            %% Pre-Stim ERPs (Parietal Old/New and FN400)
+            for i = 1:n_runs
+                %% Setup
+                r = num2str(runs(i));
+        
+                %% Load dataset
+                EEG = pop_loadset('filename', [subid, '_test', r, suffix, '.set']);
     
-            %% Load dataset
-            EEG = pop_loadset('filename', [subid, '_test', r, suffix, '.set']);
-
-            %% Get Relevant Epochs
-            EEG = pop_epoch(EEG, EVENT_TAG, ERP_EPOCH_TIMEBIN, 'newname', ...
-                [subid, '_test', num2str(r), '_erp_prestimret'], 'epochinfo', 'yes');
-
-            %% Perform baseline correction
-            EEG = pop_rmbase(EEG, ERP_BASELINE_TIMEBIN);
-
-            [ALLEEG] = eeg_store(ALLEEG, EEG, i);
-        end
-
-        suffix = [suffix, 'e'];
-
-        %% Merge sets
-        EEG = pop_mergeset(ALLEEG, 1:n_runs, 0);
-
-        %% Remove bad epochs
-        if ~isempty(bad_prestim_epochs)
-            EEG = pop_rejepoch(EEG, bad_prestim_epochs, 0);
-        end
-
-        %% Save EEGLAB set
-        [ALLEEG, EEG, CURRENTSET] = pop_newset(ALLEEG, EEG, 1, 'setname', ...
-                            'Merged datasets', 'savenew', ...
-                            [subid, suffix, '_erp_prestimret_cat.set'], ...
-                            'overwrite', 'on', 'gui', 'off');
-
-        %% Save raw
-        [n_channels, n_timepoints, n_trials] = size(EEG.data);
+                %% Get Relevant Epochs
+                EEG = pop_epoch(EEG, EVENT_TAG, ERP_EPOCH_TIMEBIN, 'newname', ...
+                    [subid, '_test', num2str(r), '_erp_prestimret'], 'epochinfo', 'yes');
     
-        erp_prestim_file = [pwd, '/', subid, suffix, '_erp_prestimret.csv'];
+                %% Perform baseline correction
+    %             EEG = pop_rmbase(EEG, ERP_BASELINE_TIMEBIN);
     
-        if exist(erp_prestim_file, 'file') == 2
-            unix('mkdir -p trash');
-            unix(['mv ', erp_prestim_file, ' trash']);
-        end
-
-        for c = 1:n_channels
-            channel_data = reshape(EEG.data(c, :, :), n_timepoints, n_trials);
-            
-            % Add column with channel number
-            label_c = EEG.chanlocs(c).labels;
-            label_c = str2num(label_c(2:end));
-            channel_data = [channel_data, repmat(label_c, n_timepoints, 1)];
-                                
-            dlmwrite(erp_prestim_file, channel_data, '-append');
+                [ALLEEG] = eeg_store(ALLEEG, EEG, i);
+            end
+    
+            suffix = [suffix, 'e'];
+    
+            %% Merge sets
+            EEG = pop_mergeset(ALLEEG, 1:n_runs, 0);
+    
+            %% Remove bad epochs
+            if ~isempty(bad_prestim_epochs)
+                EEG = pop_rejepoch(EEG, bad_prestim_epochs, 0);
+            end
+    
+            %% Save EEGLAB set
+            [ALLEEG, EEG, CURRENTSET] = pop_newset(ALLEEG, EEG, 1, 'setname', ...
+                                'Merged datasets', 'savenew', ...
+                                [subid, suffix, '_erp_prestimret_cat.set'], ...
+                                'overwrite', 'on', 'gui', 'off');
+    
+            %% Save raw
+            [n_channels, n_timepoints, n_trials] = size(EEG.data);
+        
+            erp_prestim_file = [pwd, '/', subid, suffix, '_erp_prestimret.csv'];
+        
+            if exist(erp_prestim_file, 'file') == 2
+                unix('mkdir -p trash');
+                unix(['mv ', erp_prestim_file, ' trash']);
+            end
+    
+            for c = 1:n_channels
+                channel_data = reshape(EEG.data(c, :, :), n_timepoints, n_trials);
+                
+                % Add column with channel number
+                label_c = EEG.chanlocs(c).labels;
+                label_c = str2num(label_c(2:end));
+                channel_data = [channel_data, repmat(label_c, n_timepoints, 1)];
+                                    
+                dlmwrite(erp_prestim_file, channel_data, '-append');
+            end
         end
     end
 end
